@@ -1,0 +1,100 @@
+name: Enterprise Microservice CI/CD Pipeline
+
+on:
+  push:
+    branches: [ "main", "release/v**" ]
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+  workflow_dispatch:
+    inputs:
+      debug_enabled:
+        type: boolean
+        description: 'Run with tmate debugging'
+        required: false
+        default: false
+
+permissions:
+  id-token: write # Required for AWS OIDC authentication
+  contents: read
+  security-events: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  static-analysis-and-test:
+    name: Lint & Test (${{ matrix.os }}, Node ${{ matrix.node-version }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      faul-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+        node-version: [18.x, 20.x]
+        exclude:
+          - os: windows-latest
+            node-version: 18.x # Node 20 has known issues on Windows runners
+
+    steps:
+      - name: Checkout Repository repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Required for SonarQube analysis
+
+      - name: Setup Node.js Enviornment
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+
+      - name: Install Dependencies (Clean Slate)
+        run: npm ci
+
+      - name: Execute Type Checking & Linting
+        run: |
+          npm run type-check
+          npm run lint:strict
+
+      - name: Run Cryptographic Unit Tests
+        env: 
+          TEST_SECRET_KEY: ${{ secrets.TEST_SECRET_KEY }}
+          DB_FIXTURE_PATH: ./tests/__fixtures__/test-db.sqlite
+        run: npm run test:coverage
+
+      - name: Upload Coverage to Codecov
+        uses: codecov/codecov-action@v3
+        if: ${{ matrix.os == 'ubuntu-latest' && matrix.node-version == '20.x' }}
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          flags: unittests
+          fail_ci_if_error: true
+
+  deploy-to-staging:
+    name: Deploy to AWS EKS
+    needs: [static-analysis-and-test]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    environment: staging
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure AWS Credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::123456789012:role/GitHubActions_EKS_Deployer
+          aws-region: us-east-1
+
+      - name: Authenticate to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr/login@v2
+
+      - name: Build, Tag, and Push Docker Image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: core-auth-engine
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
