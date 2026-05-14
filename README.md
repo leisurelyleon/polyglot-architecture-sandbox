@@ -10,7 +10,7 @@ From bare-metal C memory allocators and inline EVM assembly to lock-free HFT rin
 ## 📂 The Gauntlet (60 Files)
 This repository contains exactly **60** hand-typed files, spanning dozens of languages (C, C++, Rust, Go, Java, Scala, TypeScript, SQL, MASM, WebAssembly, Solidity, Python, C#, and YAML). 
 
-The architecture is categorized into **12 distinct domains**:
+The architecture is categorized into **12 distinct domains:**
 
 ```text
 ├── 01-Core-Systems-and-Bare-Metal/
