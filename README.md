@@ -77,7 +77,13 @@ The architecture is categorized into 12 distinct domains:
 │   └── deep-rational-labyrinth.ts
 │
 ├── 10-Media-and-Transcoding/
-│   └── HlsTranscodingOrchestrator.java
+│   ├── HlsTranscodingOrchestrator.java
+│   ├── distributed-av1-transcoding-worker.py
+│   ├── scene-cut-detection-engine.py
+│   ├── zero-copy-hardware-acceleration.cpp
+│   ├── rtmp-stream-demuxer.rs
+│   ├── mpeg-ts-multiplexer.go
+│   └── mpeg-dash-dynamic-manifest-engine.ts
 │
 ├── 11-Advanced-Database-Analytics/
 │   ├── recursive-cte.sql
