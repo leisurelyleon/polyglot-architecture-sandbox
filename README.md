@@ -84,14 +84,14 @@ The architecture is categorized into 12 distinct domains:
 │   ├── timeseries-sessionization.sql
 │   └── dynamic-linq-expression.cs
 │
-└── 12-DevOps-and-Concurrency/
-    ├── ci-cd-labyrinth.yaml
-    ├── devops-everything-bagel.yaml
-    ├── concurrency-pipeline.go
-    ├── asynchronous-circuit-breaker.py
-    └── memory-safe-gauntlet.rs
+├── 12-DevOps-and-Concurrency/
+│   ├── ci-cd-labyrinth.yaml
+│   ├── devops-everything-bagel.yaml
+│   ├── concurrency-pipeline.go
+│   ├── asynchronous-circuit-breaker.py
+│   └── memory-safe-gauntlet.rs
 ├── LICENSE
-├── README.md
+└── README.md
 ```
 
 ## 🚀 Key Takeaways
