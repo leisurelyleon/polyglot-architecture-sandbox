@@ -90,6 +90,8 @@ The architecture is categorized into 12 distinct domains:
     ├── concurrency-pipeline.go
     ├── asynchronous-circuit-breaker.py
     └── memory-safe-gauntlet.rs
+├── LICENSE
+├── README.md
 ```
 
 ## 🚀 Key Takeaways
