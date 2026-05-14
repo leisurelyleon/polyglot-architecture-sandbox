@@ -1,124 +1,109 @@
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::cell::UnsafeCell;
-use std::ffi::CString;
-use std::ptr;
-use std::mem;
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
+#include <array>
+#include <optional>
+#include <iostream>
+#include <thread>
 
-// 1. The data payload to be transmitted between processes
-#[derive(Copy, Clone, Default)]
-#[repr(C)]
-pub struct SignalPayload {
-    pub instrument_id: u32,
-    pub target_price: u32,
-    pub volume: u32,
-    pub side: u8,
-}
+// 1. Raw layout for an unconfirmed P2P Network Transaction
+struct RawTransaction {
+    std::array<uint8_t, 32> txid;
+    uint64_t fee;
+    uint32_t payload_size;
+    uint8_t signature_v;
+    std::array<uint8_t, 32> signature_r;
+    std::array<uint8_t, 32> signature_s;
+};
 
-// 2. The Lock-Free Queue mapped into Shared Memory
-// #[repr(C)] ensures Rust doesn't reorder the struct fields, allowing C++ or other Rust processes to read it.
-// We pad the indices to 64 bytes to prevent False Sharing across CPU cores.
-#[repr(C)]
-pub struct ShmRingBuffer<const CAPACITY: usize> {
-    #[repr(C, align(64))]
-    write_index: AtomicUsize,
-    
-    #[repr(C, align(64))]
-    read_index: AtomicUsize,
-    
-    // UnsafeCell opts-out of Rust's strict mutability guarantees, 
-    // as another process will be physically mutating this RAM.
-    buffer: [UnsafeCell<SignalPayload>; CAPACITY],
-}
+// 2. The Lock-Free Ring Buffer Data Structure
+// Capacity MUST be a power of 2 for fast modulo bitwise operations
+template <typename T, size_t Capacity>
+class LockFreeMempoolBuffer {
+    static_assert((Capacity != 0) && ((Capacity & (Capacity -1)) ==0),
+                  "Buffer capacity must be a power of 2");
 
-pub struct IpcChannel<const CAPACITY: usize> {
-    shm_ptr: *mut ShmRingBuffer<CAPACITY>,
-    shm_fd: i32,
-    size: usize,
-}
+private:
+    std::array<T, Capacity> buffer_;
 
-impl<const CAPACITY: usize> IpcChannel<CAPACITY> {
-    // 3. Initialize POSIX Shared Memory via libc
-    pub fn new(name: &str, is_producer: bool) -> Self {
-        let c_name = CString::new(name).unwrap();
-        let size = mem::size_of::<ShmRingBuffer<CAPACITY>>();
+    // Cacheline alignment prevents "False Sharing" between CPU cores
+    alignas(64) std::atomic<size_t> head_{0}; // Written by Producer (Network Thread)
+    alignas(64) std::atomic<size_t> tail_{0}; // Written by Consumer (Mining Thread)
 
-        unsafe {
-            // Open a file descriptor pointing to RAM (tmpfs), not a disk
-            let shm_fd = libc::shm_open(
-                c_name.as_ptr(),
-                libc::O_CREAT | libc::O_RDWR,
-                0o666,
-            );
-            assert!(shm_fd >= 0, "Failed to open shared memory");
+public:
+    // 3. The Producer: Pushes transactions received from the network
+    bool push(const T& item) {
+        // Relaxed load: We only care about the exact value in our own thread
+        const size_t current_head = head_.load(std::memory_order_relaxed);
 
-            if is_producer {
-                libc::ftruncate(shm_fd, size as libc::off_t);
-            }
+        // Acquire load: Ensure we see the most up-to-date tail from the consomer
+        const size_t current_tail = tail_.load(std::memory_order_acquire);
 
-            // Map the RAM into our process's virtual address space
-            let shm_ptr = libc::mmap(
-                ptr::null_mut(),
-                size,
-                libc::PROT_READ | libc::PROT_WRITE,
-                libc::MAP_SHARED,
-                shm_fd,
-                0,
-            ) as *mut ShmRingBuffer<CAPACITY>;
-
-            assert!(shm_ptr != libc::MAP_FAILED, "mmap failed");
-
-            // If we are the producer creating this, initialize the atomics
-            if is_producer {
-                ptr::write_bytes(shm_ptr, 0, 1);
-                (*shm_ptr).write_index.store(0, Ordering::Relaxed);
-                (*shm_ptr).read_index.store(0, Ordering::Relaxed);
-            }
-
-            IpcChannel { shm_ptr, shm_fd, size }
+        // Check if the buffer is full
+        if (current_head - current_tail == Capacity) {
+            return false; // Mempool is overflowing, drop packet
         }
+
+        // Bitwise AND for ultra-fast modulo arithmetic
+        buffer_[current_head & (Capacity - 1)] = item;
+
+        // Release store: Ensure the memory write to the buffer is visible
+        // Before we update the head index
+        head_.store(current_head + 1, std::memory_order_release);
+        return true;
     }
 
-    // 4. The Hot-Path Publisher (Runs on Core 1)
-    #[inline(always)]
-    pub fn publish(&self, payload: SignalPayload) -> bool {
-        unsafe {
-            let ring = &*self.shm_ptr;
-            let current_write = ring.write_index.load(Ordering::Relaxed);
-            let current_read = ring.read_index.load(Ordering::Acquire); // Synchronize with reader
+    // 4. The Consumer: Pops transactions to be validated and mined
+    std::optional<T> pop() {
+        const size_t current_tail = tail_.load(std::memory_order_relaxed);
 
-            if current_write.wrapping_sub(current_read) >= CAPACITY {
-                return false; // Queue is full, drop signal
-            }
+        // Acquire load: Ensure we see the most up-to-date head from the producer
+        const size_t current_head = head_.load(std::memory_order_acquire);
 
-            // Write data blindly into the UnsafeCell memory slot
-            let slot = ring.buffer[current_write % CAPACITY].get();
-            ptr::write_volatile(slot, payload);
-
-            // Release memory ordering guarantees the reader sees the payload *before* seeing the updated index
-            ring.write_index.store(current_write.wrapping_add(1), Ordering::Release);
-            true
+        // Check if the buffer is empty
+        if (current_tail == current_head) {
+            return std::nullopt;
         }
+
+        T item = buffer_[current_tail & (Capacity - 1)];
+
+        // Release store: Ensure we've finished reading before we move the tail,
+        // freeing up space for the producer
+        tail_.store(current_tail _ 1, std::memory_order_release);
+        return item;
     }
+};
 
-    // 5. The Hot-Path Consumer (Runs on Core 2)
-    #[inline(always)]
-    pub fn consume(&self) -> Option<SignalPayload> {
-        unsafe {
-            let ring = &*self.shm_ptr;
-            let current_read = ring.read_index.load(Ordering::Relaxed);
-            let current_write = ring.write_index.load(Ordering::Acquire); // Synchronize with writer
+// --- Execution Simulation ---
+void simulate_gossip_protocol() {
+    // Instatiate a buffer capable of holding 1024 pending transactions
+    LockFreeMempoolBuffer<RawTransaction, 1024> mempool;
 
-            if current_read == current_write {
-                return None; // Queue is empty
+    // Network Thread (Receiving data from peers)
+    std::thread network_node([&mempool]() {
+        for (uint64_t i = 1; i <= 50000; ++i) {
+            RawTransaction tx{};
+            tx.fee = i * 10; // Simulate dynamic fees
+
+            // Spin-wait if the mempool is full (Backpressure)
+            while (!mempool.push(tx)) {
+                std::this_thread::yield();
             }
-
-            // Read data blindly from the UnsafeCell memory slot
-            let slot = ring.buffer[current_read % CAPACITY].get();
-            let payload = ptr::read_volatile(slot);
-
-            // Release memory ordering tells the writer we are officially done with this memory slot
-            ring.read_index.store(current_read.wrapping_add(1), Ordering::Release);
-            Some(payload)
         }
-    }
+    });
+
+    // Mining Engine Thread (Pulling data to build a block)
+    std::thread mining_engine([&mempool]() {
+        uint64_t processed_count = 0;
+        while (processed_count < 50000) {
+            if (auto tx = mempool.pop()) {
+                processed_count++;
+                // In reality, this would group transactions and initiate SHA256 hashing
+            }
+        }
+        std::cout << "Mempool processed " << processed_count << " transactions lock-free.\n";
+    });
+
+    network_node.join();
+    mining_engine.join();
 }
