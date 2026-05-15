@@ -13,6 +13,7 @@ This repository contains exactly **60** hand-typed files, spanning dozens of lan
 The architecture is categorized into **12 distinct domains:**
 
 ```text
+polyglot-architecture-sandbox/
 ├── 01-Core-Systems-and-Bare-Metal/
 │   ├── custom-memory-allocator.c
 │   ├── windows-nt-internals.cpp
