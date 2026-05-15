@@ -22,7 +22,6 @@ polyglot-architecture-sandbox/
 │   ├── simd-vector-math.asm
 │   ├── neon-simd.asm
 │   └── cycle-precise-raster-interrupt.asm
-│
 ├── 02-High-Frequency-Trading-Engine/
 │   ├── zero-allocation-market-data-parser.cpp
 │   ├── cache-line-optimized-limit-order-book.c
@@ -30,7 +29,6 @@ polyglot-architecture-sandbox/
 │   ├── inter-process-communication.rs
 │   ├── hft-matching-engine.sc
 │   └── LmaxDisruptorSimulator.java
-│
 ├── 03-Hardware-Acceleration-and-Networking/
 │   ├── snpe-snippet.cpp
 │   ├── tensor-core-matrix.cpp
@@ -38,12 +36,10 @@ polyglot-architecture-sandbox/
 │   ├── rocm-hip.cpp
 │   ├── ethernet-switch.cpp
 │   └── wifi-driver-firmware.c
-│
 ├── 04-Distributed-Banking-Ledgers/
 │   ├── acid-double-entry-transfer.sql
 │   ├── event-sourced-ledger-engine.cs
 │   └── two-phase-commit-distributed-coordinator.go
-│
 ├── 05-Zero-Trust-Security-and-IAM/
 │   ├── cryptographic-identity-provider.go
 │   ├── memory-safe-policy.rs
@@ -53,19 +49,16 @@ polyglot-architecture-sandbox/
 │   ├── zero-copy-api-gateway.go
 │   ├── grpc-bidirectional-streaming-microservice.rs
 │   └── envoy-proxy-webassembly-filter.cpp
-│
 ├── 07-Real-Time-Event-Streaming/
 │   ├── ExactlyOnceStreamProcessor.java
 │   ├── apache-flink-complex-event-processing.sc
 │   ├── apache-spark-custom-catalyst-optimizer-rule.sc
 │   └── raft-consensus-log-appender.go
-│
 ├── 08-Web3-and-Cryptographic-Blockchains/
 │   ├── merkle-tree-pow-miner.rs
 │   ├── automated-market-maker.sol
 │   ├── aave-v3-flash-loan-arbitrage-contract.sol
 │   └── eip-712-dao-signature-execution.sol
-│
 ├── 09-Advanced-Metaprogramming-and-Web/
 │   ├── compile-time.cpp
 │   ├── monad-stack.hs
@@ -76,7 +69,6 @@ polyglot-architecture-sandbox/
 │   ├── theme-path-extractor.ts
 │   ├── type-safe-rpc-factory.ts
 │   └── deep-rational-labyrinth.ts
-│
 ├── 10-Media-and-Transcoding/
 │   ├── HlsTranscodingOrchestrator.java
 │   ├── distributed-av1-transcoding-worker.py
@@ -85,19 +77,16 @@ polyglot-architecture-sandbox/
 │   ├── rtmp-stream-demuxer.rs
 │   ├── mpeg-ts-multiplexer.go
 │   └── mpeg-dash-dynamic-manifest-engine.ts
-│
 ├── 11-Advanced-Database-Analytics/
 │   ├── recursive-cte.sql
 │   ├── timeseries-sessionization.sql
 │   └── dynamic-linq-expression.cs
-│
 ├── 12-DevOps-and-Concurrency/
 │   ├── ci-cd-labyrinth.yaml
 │   ├── devops-everything-bagel.yaml
 │   ├── concurrency-pipeline.go
 │   ├── asynchronous-circuit-breaker.py
 │   └── memory-safe-gauntlet.rs
-│
 ├── LICENSE
 └── README.md
 ```
