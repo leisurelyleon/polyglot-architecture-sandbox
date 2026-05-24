@@ -44,7 +44,6 @@ polyglot-architecture-sandbox/
 │   ├── cryptographic-identity-provider.go
 │   ├── memory-safe-policy.rs
 │   └── adaptive-anomaly-detection.ts
-│
 ├── 06-Platform-Engineering-and-Gateways/
 │   ├── zero-copy-api-gateway.go
 │   ├── grpc-bidirectional-streaming-microservice.rs
